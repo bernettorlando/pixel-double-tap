@@ -18,6 +18,7 @@ import android.os.SystemClock
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import android.util.Log
 import android.view.GestureDetector
 import android.view.Gravity
 import android.view.MotionEvent
@@ -100,6 +101,7 @@ class ScreenLockAccessibilityService : AccessibilityService() {
 
         activeInstance = this
         _isConnected.value = true
+        Log.i(TAG, "service_connected homePackages=$homePackages")
 
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
         serviceScope = scope
@@ -120,6 +122,10 @@ class ScreenLockAccessibilityService : AccessibilityService() {
         when (ev.eventType) {
             AccessibilityEvent.TYPE_VIEW_CLICKED,
             AccessibilityEvent.TYPE_VIEW_LONG_CLICKED -> {
+                Log.d(
+                    TAG,
+                    "interactive_click type=${ev.eventType} pkg=${ev.packageName} cls=${ev.className}"
+                )
                 cancelPendingConfirmation()
                 gestureTracker.onInteractiveEvent(
                     uptimeMs = now,
@@ -128,6 +134,7 @@ class ScreenLockAccessibilityService : AccessibilityService() {
             }
 
             AccessibilityEvent.TYPE_VIEW_SCROLLED -> {
+                Log.d(TAG, "interactive_scroll pkg=${ev.packageName} locked=${keyguardManager.isKeyguardLocked}")
                 cancelPendingConfirmation()
                 val cooldown = if (keyguardManager.isKeyguardLocked) {
                     DoubleTapGestureTracker.LOCK_SCREEN_SCROLL_COOLDOWN_MS
@@ -165,6 +172,10 @@ class ScreenLockAccessibilityService : AccessibilityService() {
                     }
                 }
 
+                Log.d(
+                    TAG,
+                    "window_state pkg=$pkg cls=$cls locked=${keyguardManager.isKeyguardLocked} bouncer=$bouncerActiveOnKeyguard"
+                )
                 cancelPendingConfirmation()
                 gestureTracker.onInteractiveEvent(uptimeMs = now, cooldownMs = 300L)
                 evaluateAndSyncOverlays()
@@ -221,6 +232,7 @@ class ScreenLockAccessibilityService : AccessibilityService() {
         }
 
         val locked = performGlobalAction(GLOBAL_ACTION_LOCK_SCREEN)
+        Log.i(TAG, "perform_lock_screen success=$locked")
         if (locked) {
             tapPreferences.incrementLockCount()
             gestureTracker.reset()
@@ -362,7 +374,7 @@ class ScreenLockAccessibilityService : AccessibilityService() {
     private fun hasBouncerInputNodes(root: android.view.accessibility.AccessibilityNodeInfo): Boolean {
         for (id in BOUNCER_VIEW_IDS) {
             val matches = root.findAccessibilityNodeInfosByViewId(id)
-            if (!matches.isNullOrEmpty()) {
+            if (matches != null && matches.any { it.isVisibleToUser }) {
                 return true
             }
         }
@@ -424,26 +436,36 @@ class ScreenLockAccessibilityService : AccessibilityService() {
         try {
             windowManager.addView(view, params)
             emptySpaceWatcherView = view
-        } catch (_: Exception) {
+            Log.i(
+                TAG,
+                "watcher_attached locked=${keyguardManager.isKeyguardLocked} fg=$lastForegroundAppPackage"
+            )
+        } catch (e: Exception) {
+            Log.w(TAG, "watcher_attach_failed err=${e.javaClass.simpleName}")
             emptySpaceWatcherView = null
         }
     }
 
     private fun handleOutsideTouch(nowUptimeMs: Long) {
         if (!shouldWatchEmptySpace()) {
+            Log.d(TAG, "outside_touch_ignored_not_watching")
             gestureTracker.reset()
             return
         }
 
-        when (val decision = gestureTracker.onOutsideTouchDown(nowUptimeMs)) {
+        val decision = gestureTracker.onOutsideTouchDown(nowUptimeMs)
+        Log.i(TAG, "outside_touch decision=${decision.javaClass.simpleName}")
+        when (decision) {
             is DoubleTapGestureTracker.Decision.ScheduleLockConfirmation -> {
                 cancelPendingConfirmation()
                 val runnable = Runnable {
                     pendingConfirmRunnable = null
                     val confirmTime = SystemClock.uptimeMillis()
-                    if (shouldWatchEmptySpace() &&
+                    val stillWatching = shouldWatchEmptySpace()
+                    val confirmed = stillWatching &&
                         gestureTracker.confirmPendingLock(decision.token, confirmTime)
-                    ) {
+                    Log.i(TAG, "confirm_lock stillWatching=$stillWatching confirmed=$confirmed")
+                    if (confirmed) {
                         performScreenLock()
                     }
                 }
@@ -557,6 +579,7 @@ class ScreenLockAccessibilityService : AccessibilityService() {
         emptySpaceWatcherView?.let { view ->
             try {
                 windowManager.removeView(view)
+                Log.i(TAG, "watcher_detached")
             } catch (_: Exception) {
                 // Already detached
             }
@@ -634,6 +657,7 @@ class ScreenLockAccessibilityService : AccessibilityService() {
     }
 
     companion object {
+        private const val TAG = "PixelDoubleTap"
         private const val PIXEL_LAUNCHER_PACKAGE = "com.google.android.apps.nexuslauncher"
         private const val AOSP_LAUNCHER_PACKAGE = "com.android.launcher3"
         private const val SYSTEM_UI_PACKAGE = "com.android.systemui"
@@ -650,8 +674,7 @@ class ScreenLockAccessibilityService : AccessibilityService() {
             "com.android.systemui:id/pinEntry",
             "com.android.systemui:id/passwordEntry",
             "com.android.systemui:id/lockPatternView",
-            "com.android.systemui:id/keyguard_bouncer_container",
-            "com.android.systemui:id/bouncer_primary_message_area"
+            "com.android.systemui:id/key_enter"
         )
 
         @Volatile
