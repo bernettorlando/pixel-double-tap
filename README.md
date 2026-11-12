@@ -23,7 +23,9 @@ A lightweight, 100% offline, Material You Android utility built specifically for
 
 ## Install on Pixel 11 Pro (20-Second Setup)
 
-1. Download **`PixelDoubleTap-v1.0.0.apk`** from the **Releases** page on your Pixel 11 Pro and tap to install.
+**[⬇️ Download `PixelDoubleTap-v1.0.0.apk` (1.7 MB, Signed Release)](https://github.com/bernettorlando/pixel-double-tap/raw/main/releases/PixelDoubleTap-v1.0.0.apk)** *(or from [GitHub Releases](https://github.com/bernettorlando/pixel-double-tap/releases/tag/v1.0.0))*
+
+1. Open the link above on your Pixel 11 Pro and tap to install **`PixelDoubleTap-v1.0.0.apk`**.
 2. Open **Pixel Double Tap** and follow the built-in 2-step card (required once by Android 13–17 for sideloaded APKs):
    - **Step 1 — Allow Restricted Settings**: Tap **Open App Info** → tap the **⋮** menu in the top-right corner → tap **Allow restricted settings** and verify with your fingerprint.
    - **Step 2 — Enable Accessibility**: Tap **Open Accessibility** → tap **Pixel Double Tap** → switch **Use Pixel Double Tap** ON.
