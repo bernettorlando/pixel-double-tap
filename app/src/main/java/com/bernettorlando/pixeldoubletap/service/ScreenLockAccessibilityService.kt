@@ -232,10 +232,12 @@ class ScreenLockAccessibilityService : AccessibilityService() {
         }
 
         val locked = performGlobalAction(GLOBAL_ACTION_LOCK_SCREEN)
-        Log.i(TAG, "perform_lock_screen success=$locked")
         if (locked) {
-            tapPreferences.incrementLockCount()
+            val count = tapPreferences.incrementLockCount()
             gestureTracker.reset()
+            Log.i(TAG, "perform_lock_screen success=true count=$count")
+        } else {
+            Log.i(TAG, "perform_lock_screen success=false")
         }
         return locked
     }

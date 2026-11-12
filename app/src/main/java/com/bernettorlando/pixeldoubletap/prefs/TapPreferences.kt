@@ -35,12 +35,23 @@ class TapPreferences private constructor(context: Context) {
     private val _settings = MutableStateFlow(readSettings())
     val settings: StateFlow<TapSettings> = _settings.asStateFlow()
 
+    @Suppress("unused")
     private val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
         _settings.value = readSettings()
     }
 
     init {
         prefs.registerOnSharedPreferenceChangeListener(listener)
+    }
+
+    private inline fun updatePrefs(block: SharedPreferences.Editor.() -> Unit) {
+        prefs.edit().apply(block).apply()
+        // Emit immediately in-process (also immune to R8 shrinking WeakHashMap listeners)
+        _settings.value = readSettings()
+        // Keep listener strongly reachable across the instance lifetime
+        if (listener.hashCode() == Int.MIN_VALUE) {
+            prefs.registerOnSharedPreferenceChangeListener(listener)
+        }
     }
 
     private fun readSettings(): TapSettings {
@@ -69,19 +80,19 @@ class TapPreferences private constructor(context: Context) {
     }
 
     fun setMasterEnabled(enabled: Boolean) {
-        prefs.edit().putBoolean(KEY_MASTER_ENABLED, enabled).apply()
+        updatePrefs { putBoolean(KEY_MASTER_ENABLED, enabled) }
     }
 
     fun setHomeScreenEnabled(enabled: Boolean) {
-        prefs.edit().putBoolean(KEY_HOME_SCREEN_ENABLED, enabled).apply()
+        updatePrefs { putBoolean(KEY_HOME_SCREEN_ENABLED, enabled) }
     }
 
     fun setLockScreenEnabled(enabled: Boolean) {
-        prefs.edit().putBoolean(KEY_LOCK_SCREEN_ENABLED, enabled).apply()
+        updatePrefs { putBoolean(KEY_LOCK_SCREEN_ENABLED, enabled) }
     }
 
     fun setStatusBarEnabled(enabled: Boolean) {
-        prefs.edit().putBoolean(KEY_STATUS_BAR_ENABLED, enabled).apply()
+        updatePrefs { putBoolean(KEY_STATUS_BAR_ENABLED, enabled) }
     }
 
     fun setDoubleTapTimeoutMs(timeoutMs: Int) {
@@ -89,7 +100,7 @@ class TapPreferences private constructor(context: Context) {
             TapSettings.MIN_DOUBLE_TAP_TIMEOUT_MS,
             TapSettings.MAX_DOUBLE_TAP_TIMEOUT_MS
         )
-        prefs.edit().putInt(KEY_DOUBLE_TAP_TIMEOUT_MS, clamped).apply()
+        updatePrefs { putInt(KEY_DOUBLE_TAP_TIMEOUT_MS, clamped) }
     }
 
     fun setClickVerifyDelayMs(delayMs: Int) {
@@ -97,16 +108,17 @@ class TapPreferences private constructor(context: Context) {
             TapSettings.MIN_CLICK_VERIFY_DELAY_MS,
             TapSettings.MAX_CLICK_VERIFY_DELAY_MS
         )
-        prefs.edit().putInt(KEY_CLICK_VERIFY_DELAY_MS, clamped).apply()
+        updatePrefs { putInt(KEY_CLICK_VERIFY_DELAY_MS, clamped) }
     }
 
     fun setHapticFeedback(enabled: Boolean) {
-        prefs.edit().putBoolean(KEY_HAPTIC_FEEDBACK, enabled).apply()
+        updatePrefs { putBoolean(KEY_HAPTIC_FEEDBACK, enabled) }
     }
 
-    fun incrementLockCount() {
+    fun incrementLockCount(): Int {
         val next = prefs.getInt(KEY_LOCK_COUNT, 0) + 1
-        prefs.edit().putInt(KEY_LOCK_COUNT, next).apply()
+        updatePrefs { putInt(KEY_LOCK_COUNT, next) }
+        return next
     }
 
     companion object {

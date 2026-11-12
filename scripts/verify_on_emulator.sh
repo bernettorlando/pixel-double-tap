@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -uo pipefail
+set -u
 
 OUT_DIR="emulator-verification"
 REPORT="${OUT_DIR}/verification_report.md"
@@ -33,19 +33,27 @@ record_result() {
 }
 
 get_wakefulness() {
-  adb shell dumpsys power | tr -d '\r' | grep -E "mWakefulness=" | head -n 1 | sed 's/^[[:space:]]*//'
+  local dump
+  dump=$(adb shell dumpsys power | tr -d '\r')
+  grep -E "mWakefulness=" <<< "${dump}" | head -n 1 | sed 's/^[[:space:]]*//'
 }
 
 get_display_state() {
-  adb shell dumpsys power | tr -d '\r' | grep -E "Display Power: state=" | head -n 1 | sed 's/^[[:space:]]*//'
+  local dump
+  dump=$(adb shell dumpsys power | tr -d '\r')
+  grep -E "mHoldingDisplaySuspendBlocker=" <<< "${dump}" | head -n 1 | sed 's/^[[:space:]]*//'
 }
 
 is_screen_awake() {
-  adb shell dumpsys power | tr -d '\r' | grep -q "mWakefulness=Awake"
+  local dump
+  dump=$(adb shell dumpsys power | tr -d '\r')
+  grep -q "mWakefulness=Awake" <<< "${dump}"
 }
 
 is_screen_off_or_dozing() {
-  adb shell dumpsys power | tr -d '\r' | grep -Eq "mWakefulness=(Asleep|Dozing)|Display Power: state=(OFF|DOZE)"
+  local dump
+  dump=$(adb shell dumpsys power | tr -d '\r')
+  grep -Eq "mWakefulness=(Asleep|Dozing)" <<< "${dump}"
 }
 
 capture_png() {
@@ -156,8 +164,10 @@ adb shell am start -n "${MAIN_ACT}" >/dev/null
 sleep 2.5
 capture_png "02_active_dashboard.png"
 
-adb shell input swipe $((WIDTH / 2)) $((HEIGHT * 76 / 100)) $((WIDTH / 2)) $((HEIGHT * 24 / 100)) 350
-sleep 1.8
+adb shell input swipe $((WIDTH / 2)) $((HEIGHT * 78 / 100)) $((WIDTH / 2)) $((HEIGHT * 22 / 100)) 300
+sleep 1.0
+adb shell input swipe $((WIDTH / 2)) $((HEIGHT * 78 / 100)) $((WIDTH / 2)) $((HEIGHT * 22 / 100)) 300
+sleep 1.5
 capture_png "03_zones_and_testpad.png"
 
 # Coordinates in empty middle wallpaper area on Pixel Pro portrait screen
@@ -295,14 +305,19 @@ adb shell locksettings clear --old 1234 || true
 # 10. Verify Live "Power button presses saved" Counter in MainActivity
 # ---------------------------------------------------------------------------
 adb shell am start -n "${MAIN_ACT}" >/dev/null
-sleep 2.5
+sleep 1.8
+adb shell input swipe $((WIDTH / 2)) $((HEIGHT * 25 / 100)) $((WIDTH / 2)) $((HEIGHT * 82 / 100)) 300
+sleep 0.8
+adb shell input swipe $((WIDTH / 2)) $((HEIGHT * 25 / 100)) $((WIDTH / 2)) $((HEIGHT * 82 / 100)) 300
+sleep 1.5
 capture_png "07_verified_counter.png"
 
-LOCK_SUCCESS_LOGS=$(adb logcat -d -s PixelDoubleTap:I | grep -c "perform_lock_screen success=true" || true)
-if [ "${LOCK_SUCCESS_LOGS}" -ge 2 ]; then
-  record_result "GLOBAL_ACTION_LOCK_SCREEN Execution & Counter" "PASS" "\`performGlobalAction(GLOBAL_ACTION_LOCK_SCREEN)\` succeeded ${LOCK_SUCCESS_LOGS} times (biometrics preserved)"
+LOGCAT_ALL=$(adb logcat -d -s PixelDoubleTap:I)
+LOCK_SUCCESS_LOGS=$(grep -c "perform_lock_screen success=true" <<< "${LOGCAT_ALL}" || true)
+if [ "${LOCK_SUCCESS_LOGS}" -ge 2 ] && grep -q "count=2" <<< "${LOGCAT_ALL}"; then
+  record_result "GLOBAL_ACTION_LOCK_SCREEN Execution & Live Counter" "PASS" "\`performGlobalAction(GLOBAL_ACTION_LOCK_SCREEN)\` succeeded ${LOCK_SUCCESS_LOGS} times; live counter updated to \`2\`"
 else
-  record_result "GLOBAL_ACTION_LOCK_SCREEN Execution & Counter" "FAIL" "Expected >=2 lock actions, observed ${LOCK_SUCCESS_LOGS}"
+  record_result "GLOBAL_ACTION_LOCK_SCREEN Execution & Live Counter" "FAIL" "Expected >=2 lock actions and count=2, observed ${LOCK_SUCCESS_LOGS}"
 fi
 
 # Dump full PixelDoubleTap & Window/Accessibility diagnostics
