@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">Pixel Double Tap</string>
+    <string name="accessibility_service_label">Pixel Double Tap</string>
+    <string name="accessibility_service_summary">Double-tap empty space on Home or Lock Screen to turn screen off</string>
+    <string name="accessibility_service_description">Pixel Double Tap uses Android\'s Accessibility lock action (GLOBAL_ACTION_LOCK_SCREEN) solely to turn your Pixel 11 Pro screen off when you double-tap empty wallpaper space on your Home Screen or Lock Screen, while keeping Ultrasonic Fingerprint and Face Unlock working.\n\nPrivacy guarantee:\n• Zero Internet permission (100% offline)\n• Checks only whether the Home Screen, Lock Screen, or keyboard is active (never reads or stores text, messages, or passwords)\n• Touch watcher is completely detached while inside apps or when the keyboard is open.</string>
+    <string name="qs_tile_label">Lock Screen</string>
+    <string name="widget_label">Invisible Double-Tap Zone</string>
+</resources>
